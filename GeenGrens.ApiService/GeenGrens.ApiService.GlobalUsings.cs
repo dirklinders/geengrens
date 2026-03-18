@@ -27,3 +27,4 @@ global using System.Net.Http;
 global using System.Net.Http.Json;
 global using System.Threading;
 global using System.Threading.Tasks;
+global using Microsoft.AspNetCore.Authentication;

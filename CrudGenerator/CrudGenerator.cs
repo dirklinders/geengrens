@@ -28,12 +28,14 @@ public class CrudGenerator : IIncrementalGenerator
                     if (symbol.ContainingNamespace.ToDisplayString() != "GeenGrens.ApiService.Models")
                         return null;
 
+                    var attribute = ctx.Attributes[0];
+
                     bool admin = false;
 
-                    foreach (var arg in ctx.Attributes[0].NamedArguments)
+
+                    if (attribute.ConstructorArguments.Length > 0)
                     {
-                        if (arg.Key == "Admin")
-                            admin = (bool)arg.Value.Value!;
+                        admin = (bool)attribute.ConstructorArguments[0].Value!;
                     }
 
                     return new ModelInfo(symbol.Name, admin, symbol);
