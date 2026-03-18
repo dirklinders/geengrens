@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Project Path="Blog.Web/Blog.Web.csproj" />
+  <Project Path="CrudGenerator/CrudGenerator.csproj" Id="f1c6d6c2-ad3f-419d-ae6e-56d45ae4bc93" />
+  <Project Path="GeenGrens.ApiService/GeenGrens.ApiService.csproj" />
+  <Project Path="GeenGrens.AppHost/GeenGrens.AppHost.csproj" />
+  <Project Path="GeenGrens.ServiceDefaults/GeenGrens.ServiceDefaults.csproj" />
+  <Project Path="GeenGrens.Web/GeenGrens.Web.csproj" />
+</Solution>
