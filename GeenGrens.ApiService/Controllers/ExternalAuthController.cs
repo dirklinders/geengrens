@@ -16,7 +16,7 @@ public class ExternalAuthController(SignInManager<UserModel> _signInManager, Use
     }
 
     [HttpGet("ExternalLoginCallback")]
-    public async Task<IActionResult> ExternalLoginCallback(string returnUrl = "/")
+    public async Task<IActionResult> ExternalLoginCallback(string returnUrl = "")
     {
         var info = await _signInManager.GetExternalLoginInfoAsync();
         if (info == null)

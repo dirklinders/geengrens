@@ -58,7 +58,8 @@ public class AuthController(UserManager<UserModel> _userManager,  SignInManager<
             return Ok(new
             {
                 isAuthenticated = true,
-                email = user.Email
+                email = user.Email,
+                name = user.FullName
             });
         }
         return Ok(new { isAuthenticated = false });

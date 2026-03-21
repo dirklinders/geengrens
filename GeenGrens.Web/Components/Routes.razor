@@ -1,20 +1,17 @@
-﻿@using GeenGrens.Web.Components.Pages
+﻿
 @inject NavigationManager Navigation
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(Program).Assembly">
         <Found Context="routeData">
-            @if (routeData.PageType == typeof(Pages.Login))  // allow /login without auth
-            {
-                <RouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)" />
-            }
-            else
-            {
                 <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(Layout.MainLayout)">
-                    <NotAuthorized>                        
-                        <RedirectToLogin ReturnUrl="@Navigation.ToBaseRelativePath(Navigation.Uri)" />
+                    <NotAuthorized>
+                    <!--
+                            var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
+                            Navigation.NavigateTo($"authentication/login?returnUrl={Uri.EscapeDataString(returnUrl)}", true);
+                        
+                        <RedirectToLogin ReturnUrl="@Navigation.ToBaseRelativePath(Navigation.Uri)" />-->
                     </NotAuthorized>
                 </AuthorizeRouteView>
-            }
         </Found>
         <NotFound>
             <LayoutView Layout="@typeof(Layout.MainLayout)">

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace GeenGrens.ApiService.Controllers;
 
+[Authorize]
 [Route("api/[controller]")]
 [ApiController]
 public class ChatFEController(ChatFEManager _chatManager) : ControllerBase

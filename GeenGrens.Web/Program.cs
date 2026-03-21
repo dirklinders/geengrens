@@ -1,7 +1,10 @@
 using GeenGrens.Web.Clients;
 using GeenGrens.Web.Components;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server;
+using System.Net;
 using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,13 +31,27 @@ builder.Services.AddHttpClient<ChatApiClient>(client =>
         // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
         client.BaseAddress = new("https+http://apiservice");
     });
+builder.Services.AddHttpClient<AuthService>(client =>
+{
+    
+    
+    // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
+    // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
+    client.BaseAddress = new("https+http://apiservice");
+}).ConfigurePrimaryHttpMessageHandler(() =>
+{
+    return new HttpClientHandler
+    {
+        UseCookies = true,
+        CookieContainer = new CookieContainer()
+    };
+});
 
+//builder.Services.AddScoped<CustomAuthStateProvider>();
+builder.Services.AddScoped<AuthenticationStateProvider,CustomAuthStateProvider>();
+builder.Services.AddScoped<IAuthorizationMiddlewareResultHandler, CustomAuthorizationMiddlewareResultHandler>();
 
-builder.Services.AddScoped<CustomAuthStateProvider>();
-builder.Services.AddScoped<AuthenticationStateProvider>(sp =>
-    sp.GetRequiredService<CustomAuthStateProvider>());
-
-builder.Services.AddAuthorizationCore();
+builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
@@ -44,6 +61,7 @@ if (!app.Environment.IsDevelopment())
     // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
+
 
 app.UseHttpsRedirection();
 
@@ -62,22 +80,44 @@ app.Run();
 
 public class CustomAuthStateProvider : AuthenticationStateProvider
 {
-    private readonly HttpClient _httpClient;
-    public CustomAuthStateProvider(HttpClient httpClient)
+    private readonly AuthService _authService;
+    public CustomAuthStateProvider(AuthService authService)
     {
-        _httpClient = httpClient;
+        _authService = authService;
     }
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
+    
+    {        
+        return await _authService.GetAuthenticationStateAsync();
+    }
+}
+
+public class CustomAuthorizationMiddlewareResultHandler : IAuthorizationMiddlewareResultHandler
+{
+    private readonly AuthorizationMiddlewareResultHandler _defaultHandler = new();
+    public async Task HandleAsync(RequestDelegate next, HttpContext context, AuthorizationPolicy policy, PolicyAuthorizationResult authorizeResult)
     {
-        var userInfo = await _httpClient.GetFromJsonAsync<Dictionary<string,string>>("/api/auth/isAuthenticated");
-        var identity = userInfo is not null
-            ? new ClaimsIdentity(new[]
-            {
-                new Claim(ClaimTypes.Name,  string.Empty),
-                // Add additional claims as needed
-            }, "Custom")
-            : new ClaimsIdentity();
-        return new AuthenticationState(new ClaimsPrincipal(identity));
+        // Get the AuthService from RequestServices
+        var authService = context.RequestServices.GetRequiredService<AuthService>();
+        var authState = await authService.GetAuthenticationStateAsync();
+
+        // If our service says the user is logged in, manually set the HttpContext User
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            context.User = authState.User;
+            // Proceed as if authorized
+            await _defaultHandler.HandleAsync(next, context, policy, PolicyAuthorizationResult.Success());
+            return;
+        }
+
+        if (authorizeResult.Challenged)
+        {
+            var returnUrl = context.Request.Path + context.Request.QueryString;
+            context.Response.Redirect($"/login?returnUrl={Uri.EscapeDataString(returnUrl)}");
+            return;
+        }
+
+        await _defaultHandler.HandleAsync(next, context, policy, authorizeResult);
     }
 }
 

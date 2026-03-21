@@ -54,6 +54,11 @@ builder.Services.AddAuthentication("Cookies")
         options.AccessDeniedPath = "/access-denied";
         options.Cookie.HttpOnly = true;
         options.SlidingExpiration = true;
+        options.Cookie.Name = "AuthCookie";
+#if debug
+        options.Cookie.SameSite = SameSiteMode.None; // allow cross-site
+#endif
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // must be HTTPS
     }).AddGoogle(opts =>
     {
         opts.AccessDeniedPath = "/access-denied";
