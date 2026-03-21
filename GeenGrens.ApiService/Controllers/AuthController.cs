@@ -50,7 +50,8 @@ public class AuthController(UserManager<UserModel> _userManager,  SignInManager<
     }
     [Authorize]
     [HttpGet("IsAuthenticated")]
-    public async Task<IActionResult> IsAuthenticated() {         
+    public async Task<IActionResult> IsAuthenticated() 
+    {         
         if (User.Identity?.IsAuthenticated == true)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);

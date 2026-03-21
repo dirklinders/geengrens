@@ -4,8 +4,6 @@ public class ChatApiClient(HttpClient httpClient)
 {
     public async Task<List<string>> GetChatsAsync(CancellationToken cancellationToken = default)
     {
-        
-
         var chats = await httpClient.GetFromJsonAsAsyncEnumerable<string>("/api/chatfe/getchats?characterId=4", cancellationToken).ToListAsync(cancellationToken);
         List<string>? chatsNotnull = chats?.Where(x => x != null).Select(x => x!).ToList();
 

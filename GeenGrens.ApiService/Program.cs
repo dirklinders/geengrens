@@ -35,7 +35,7 @@ builder.Services.AddCors(options =>
     options.AddDefaultPolicy(
         policy =>
         {
-            policy.WithOrigins("https://localhost:7022") // Blazor FE dev URL
+            policy.WithOrigins("https://localhost:3000","http://localhost:3000") // Blazor FE dev URL
                   .AllowAnyHeader()
                   .AllowAnyMethod()
                   .AllowCredentials(); // if using cookies/auth
@@ -52,13 +52,20 @@ builder.Services.AddAuthentication("Cookies")
         options.LoginPath = "/login";
         options.LogoutPath = "/logout";
         options.AccessDeniedPath = "/access-denied";
+
+        options.Cookie.Name = "AuthCookie";
         options.Cookie.HttpOnly = true;
         options.SlidingExpiration = true;
-        options.Cookie.Name = "AuthCookie";
-#if debug
-        options.Cookie.SameSite = SameSiteMode.None; // allow cross-site
+
+#if DEBUG
+        // Cross-site in dev (FE :3000 → BE :7424)
+        options.Cookie.SameSite = SameSiteMode.None;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+#else
+    // Same-domain in production (via reverse proxy)
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 #endif
-        options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // must be HTTPS
     }).AddGoogle(opts =>
     {
         opts.AccessDeniedPath = "/access-denied";
