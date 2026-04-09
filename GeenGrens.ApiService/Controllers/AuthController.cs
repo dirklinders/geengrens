@@ -6,7 +6,10 @@ namespace GeenGrens.ApiService.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-public class AuthController(UserManager<UserModel> _userManager,  SignInManager<UserModel> _signInManager) : ControllerBase
+public class AuthController(
+    UserManager<UserModel> _userManager,
+    SignInManager<UserModel> _signInManager,
+    GeenGrensContext _dbContext) : ControllerBase
 {
     [HttpPost("Login")]
     public async Task<IActionResult> Login(LoginDTO dto)
@@ -50,17 +53,29 @@ public class AuthController(UserManager<UserModel> _userManager,  SignInManager<
     }
     [Authorize]
     [HttpGet("IsAuthenticated")]
-    public async Task<IActionResult> IsAuthenticated() 
-    {         
+    public async Task<IActionResult> IsAuthenticated()
+    {
         if (User.Identity?.IsAuthenticated == true)
         {
             var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var user = await _userManager.FindByIdAsync(userId);
+
+            string? teamName = null;
+            if (user?.TeamId > 0)
+            {
+                var team = await _dbContext.Teams.FindAsync(user.TeamId);
+                teamName = team?.Name;
+            }
+
+            var isAdmin = await _userManager.IsInRoleAsync(user!, "admin");
+
             return Ok(new
             {
                 isAuthenticated = true,
-                email = user.Email,
-                name = user.FullName
+                email = user!.Email,
+                name = user.FullName,
+                teamName,
+                isAdmin,
             });
         }
         return Ok(new { isAuthenticated = false });

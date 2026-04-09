@@ -6,7 +6,7 @@ namespace GeenGrens.ApiService.Controllers;
 [Route("api/[controller]")]
 public class ExternalAuthController(SignInManager<UserModel> _signInManager, UserManager<UserModel> _userManager) : ControllerBase
 {
-    private string FEUrl = "https://localhost:7220";
+    private string FEUrl = "https://localhost:3000";
     [HttpGet("LoginGoogle")]
     public async Task<IActionResult> LoginGoogle(string returnUrl = "/")
     {
