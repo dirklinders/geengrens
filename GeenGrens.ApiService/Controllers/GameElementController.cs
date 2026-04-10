@@ -102,6 +102,7 @@ public class GameElementController(
                 : (string?)null,
             canAccessChat = progress.CanAccessChat,
             canSubmitTip = progress.CanSubmitTip,
+            isPlaytest = team?.IsPlaytest ?? false,
         });
     }
 

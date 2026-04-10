@@ -10,7 +10,12 @@ public class TeamModel
     /// Leave null to use the default "Onder de trap".
     /// </summary>
     public string? NotebookLocation { get; set; }
+    /// <summary>
+    /// When true, this team gets access to the digital playtest notebook in the game UI.
+    /// </summary>
+    public bool IsPlaytest { get; set; }
 
     public List<TeamProgressModel> TeamProgresss { get; set; } = [];
     public List<TeamUnlockModel> TeamUnlocks { get; set; } = [];
+    public List<ChatModel> Chats { get; set; } = [];
 }
