@@ -5,8 +5,6 @@ using Microsoft.AspNetCore.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add service defaults & Aspire client integrations.
-builder.AddServiceDefaults();
 
 // Add services to the container.
 builder.Services.AddProblemDetails();
@@ -141,8 +139,6 @@ app.UseAuthorization();
 app.MapGet("/", () => "API service is running.");
 
 app.MapControllers();
-
-app.MapDefaultEndpoints();
 
 app.Run();
 

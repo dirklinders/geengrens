@@ -9,7 +9,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CrudGenerator\CrudGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="..\GeenGrens.ServiceDefaults\GeenGrens.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>
