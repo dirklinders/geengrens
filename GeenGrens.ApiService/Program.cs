@@ -130,6 +130,16 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 
+
+#else
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto,
+    KnownProxies = { IPAddress.Parse("127.0.0.1") }
+});
+
 #endif
 
 
