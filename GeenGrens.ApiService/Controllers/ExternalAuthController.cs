@@ -10,8 +10,6 @@ public class ExternalAuthController(SignInManager<UserModel> _signInManager, Use
     [HttpGet("LoginGoogle")]
     public async Task<IActionResult> LoginGoogle(string returnUrl = "/")
     {
-        var location = Request.Host;
-        Console.WriteLine($"Request from: {location}");
         var redirectUrl = Url.Action("ExternalLoginCallback", "ExternalAuth", new { returnUrl });
         var properties = _signInManager.ConfigureExternalAuthenticationProperties("Google", redirectUrl);
         return Challenge(properties, "Google");
