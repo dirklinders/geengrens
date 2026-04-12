@@ -40,6 +40,9 @@
     <None Update="SqlScripts\manual_002_team_isplaytest.sql">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="SqlScripts\manual_003_make_me_admin.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
