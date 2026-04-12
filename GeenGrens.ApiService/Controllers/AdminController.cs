@@ -54,6 +54,43 @@ public class AdminController(
     }
 
     /// <summary>
+    /// Creates a new user with email and password.
+    /// </summary>
+    [HttpPost("CreateUser")]
+    public async Task<IActionResult> CreateUser([FromBody] CreateUserDTO dto)
+    {
+        var user = new UserModel
+        {
+            UserName = dto.Email,
+            Email = dto.Email,
+            NormalizedEmail = dto.Email.ToUpperInvariant(),
+            FullName = dto.Name ?? dto.Email,
+            EmailConfirmed = true,
+            TeamId = 0,
+        };
+
+        var result = await userManager.CreateAsync(user, dto.Password);
+
+        if (!result.Succeeded)
+            return BadRequest(result.Errors.Select(e => e.Description));
+
+        return Ok(new { id = user.Id, email = user.Email, name = user.FullName });
+    }
+
+    /// <summary>
+    /// Deletes a user by ID.
+    /// </summary>
+    [HttpDelete("DeleteUser/{userId}")]
+    public async Task<IActionResult> DeleteUser(string userId)
+    {
+        var user = await userManager.FindByIdAsync(userId);
+        if (user == null) return NotFound("Gebruiker niet gevonden.");
+
+        var result = await userManager.DeleteAsync(user);
+        return result.Succeeded ? Ok() : BadRequest(result.Errors.Select(e => e.Description));
+    }
+
+    /// <summary>
     /// Promotes a user to the admin role.
     /// </summary>
     [HttpPost("MakeAdmin")]
@@ -164,5 +201,12 @@ public class AdminController(
         public bool? IsNotebookUnlocked { get; set; }
         public bool? CanAccessChat { get; set; }
         public bool? CanSubmitTip { get; set; }
+    }
+
+    public class CreateUserDTO
+    {
+        public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty;
+        public string? Name { get; set; }
     }
 }
