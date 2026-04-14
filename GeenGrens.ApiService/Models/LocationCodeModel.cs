@@ -9,7 +9,11 @@ public class LocationCodeModel
 {
     public int Id { get; set; }
 
-    /// <summary>Code players must enter (e.g. "KERK2026")</summary>
+    /// <summary>
+    /// Code used for both manual entry and NFC scanning.
+    /// For NFC tags, set this to a GUID — the tag URL will be /api/Unlock/{Code}.
+    /// For manual entry, use a short human-readable code (e.g. "KERK2026").
+    /// </summary>
     public string Code { get; set; } = string.Empty;
 
     /// <summary>Human-readable name of the location (e.g. "De Kerk")</summary>

@@ -29,6 +29,71 @@ public class UnlockController(
     // Endpoints
     // ────────────────────────────────────────────────────────────
 
+    // ────────────────────────────────────────────────────────────
+    // NFC scan redirect
+    // ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// NFC tag entry point. The tag URL is: /api/Unlock/{nfcCode}
+    /// - Not authenticated  → redirect to login page with returnUrl
+    /// - No team assigned   → redirect to home (player needs to be set up first)
+    /// - Code not found     → redirect to /unlock with an error hint
+    /// - Already unlocked   → redirect straight to /chat (idempotent)
+    /// - Success            → unlock + redirect to /chat
+    /// </summary>
+    [HttpGet("{nfcCode}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ScanNfc(string nfcCode)
+    {
+        // Not logged in → send to login, come back here after
+        if (!(User.Identity?.IsAuthenticated ?? false))
+            return LocalRedirect($"/login?returnUrl=/api/Unlock/{nfcCode}");
+
+        var teamId = await GetTeamId();
+        if (teamId == 0)
+            return LocalRedirect("/?nfc=noteam");
+
+        var locationCode = await dbContext.LocationCodes
+            .Include(l => l.Character)
+            .FirstOrDefaultAsync(l => l.Code == nfcCode);
+
+        if (locationCode == null)
+            return LocalRedirect("/unlock?nfc=invalid");
+
+        // Already unlocked — just navigate to chat
+        var alreadyUnlocked = await dbContext.TeamUnlocks
+            .AnyAsync(u => u.TeamId == teamId && u.LocationCodeId == locationCode.Id);
+
+        if (!alreadyUnlocked)
+        {
+            // Record unlock
+            dbContext.TeamUnlocks.Add(new TeamUnlockModel
+            {
+                TeamId = teamId,
+                LocationCodeId = locationCode.Id,
+                UnlockedAt = DateTime.UtcNow,
+            });
+
+            // Update progress flags
+            var progress = await dbContext.TeamProgresss.FirstOrDefaultAsync(p => p.TeamId == teamId);
+            if (progress == null)
+            {
+                progress = new TeamProgressModel { TeamId = teamId };
+                dbContext.TeamProgresss.Add(progress);
+            }
+            progress.CanAccessChat = true;
+
+            var totalCodes = await dbContext.LocationCodes.CountAsync();
+            var teamUnlockCount = await dbContext.TeamUnlocks.CountAsync(u => u.TeamId == teamId) + 1;
+            if (totalCodes > 0 && teamUnlockCount >= totalCodes)
+                progress.CanSubmitTip = true;
+
+            await dbContext.SaveChangesAsync();
+        }
+
+        return LocalRedirect($"/chat?character={locationCode.CharacterId}");
+    }
+
     /// <summary>
     /// Enter a location code. On success, records the unlock for this team
     /// and returns the unlocked character info.
