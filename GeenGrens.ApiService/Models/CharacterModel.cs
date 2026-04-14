@@ -13,9 +13,6 @@ public class CharacterModel
     public string AvatarUrl { get; set; } = string.Empty;
     public string? Personality { get; set; }
 
-    public int StoryId { get; set; }
-
-    public StoryModel Story { get; set; }
     public List<ChatModel> Chats { get; set; } = [];
     public List<LocationCodeModel> LocationCodes { get; set; } = [];
 

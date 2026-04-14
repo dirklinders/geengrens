@@ -153,7 +153,6 @@ public class GameElementController(
                 c.Description,
                 c.AvatarUrl,
                 c.Personality,
-                c.StoryId,
             })
             .ToListAsync();
 
