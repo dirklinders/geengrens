@@ -49,7 +49,7 @@ public class GameElementController(
     [HttpPost("VerifyPassword")]
     public async Task<IActionResult> VerifyPassword([FromBody] PasswordDTO dto)
     {
-        if (dto.Password != "9360" && dto.Password != "0639")
+        if (dto.Password != "15133624")
             return Ok(new { success = false, notebookLocation = "" });
 
         var user = await GetCurrentUser();

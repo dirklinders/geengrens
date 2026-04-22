@@ -84,7 +84,10 @@ public class AuthController(
     [HttpPost("Logout")]
     public async Task<IActionResult> Logout()
     {
+        // Sign out of ASP.NET Identity (clears Identity.Application + External + 2FA cookies)
         await _signInManager.SignOutAsync();
+        // Also sign out of the custom "Cookies" scheme registered in Program.cs
+        await HttpContext.SignOutAsync("Cookies");
         return Ok(new
         {
             message = "Logout successful"
