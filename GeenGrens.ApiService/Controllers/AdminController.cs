@@ -181,6 +181,81 @@ public class AdminController(
         return Ok();
     }
 
+    /// <summary>
+    /// Returns a single team's full detail: progress flags, unlocked location
+    /// codes, and — for each unlocked character — the full chat transcript.
+    /// </summary>
+    [HttpGet("TeamDetail/{teamId}")]
+    public async Task<IActionResult> GetTeamDetail(int teamId)
+    {
+        var team = await dbContext.Teams.FindAsync(teamId);
+        if (team == null) return NotFound("Team niet gevonden.");
+
+        var progress = await dbContext.TeamProgresss
+            .FirstOrDefaultAsync(p => p.TeamId == teamId);
+
+        var members = userManager.Users
+            .Where(u => u.TeamId == teamId)
+            .Select(u => new { id = u.Id, email = u.Email, fullName = u.FullName })
+            .ToList();
+
+        // Unlocks with location + character eager-loaded
+        var unlocks = await dbContext.TeamUnlocks
+            .Where(u => u.TeamId == teamId)
+            .Include(u => u.LocationCode)
+                .ThenInclude(lc => lc.Character)
+            .OrderBy(u => u.UnlockedAt)
+            .ToListAsync();
+
+        // All chats for this team, grouped by character
+        var chats = await dbContext.Chats
+            .Where(c => c.TeamId == teamId)
+            .OrderBy(c => c.Id)
+            .ToListAsync();
+
+        var chatsByCharacter = chats
+            .GroupBy(c => c.CharacterId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(c => new { role = c.Role, message = c.Message }).ToList()
+            );
+
+        var unlockedCodes = unlocks.Select(u =>
+        {
+            var lc = u.LocationCode;
+            var ch = lc?.Character;
+            var chatList = ch != null && chatsByCharacter.TryGetValue(ch.Id, out var cl) ? cl : [];
+            return new
+            {
+                code          = lc?.Code,
+                locationName  = lc?.LocationName,
+                unlockedAt    = u.UnlockedAt,
+                characterId   = ch?.Id,
+                characterName = ch?.Name,
+                chats         = chatList,
+            };
+        });
+
+        return Ok(new
+        {
+            teamId           = team.Id,
+            teamName         = team.Name,
+            notebookLocation = team.NotebookLocation ?? "Onder de trap",
+            members,
+            progress = progress == null ? null : new
+            {
+                isNotebookUnlocked = progress.IsNotebookUnlocked,
+                canAccessChat      = progress.CanAccessChat,
+                canSubmitTip       = progress.CanSubmitTip,
+                tipSubmitted       = progress.TipSubmitted,
+                tipSuspectId       = progress.TipSuspectId,
+                tipMotive          = progress.TipMotive,
+                tipIsCorrect       = progress.TipIsCorrect,
+            },
+            unlockedCodes,
+        });
+    }
+
     // ────────────────────────────────────────────────────────────
     // DTOs
     // ────────────────────────────────────────────────────────────

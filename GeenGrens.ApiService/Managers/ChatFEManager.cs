@@ -41,6 +41,16 @@ public class ChatFEManager
         if (character == null)
             throw new Exception("Character not found");
 
+        // Resolve bar name for {BarNaam} placeholder substitution
+        string barName = "de bar";
+        if (teamId.HasValue)
+        {
+            var team = await _geenGrensContext.Teams.FindAsync([teamId.Value], cancellationToken);
+            if (!string.IsNullOrWhiteSpace(team?.BarName))
+                barName = team.BarName;
+        }
+        var systemPrompt = (character.SystemPrompt ?? "").Replace("{BarNaam}", barName);
+
         // Build message history from DB
         var previousChats = _geenGrensContext.Chats
             .Where(x => x.CharacterId == characterId && x.TeamId == teamId)
@@ -49,7 +59,7 @@ public class ChatFEManager
 
         var messages = new List<ChatMessage>
         {
-            new SystemChatMessage(character.SystemPrompt)
+            new SystemChatMessage(systemPrompt)
         };
 
         foreach (var chat in previousChats)

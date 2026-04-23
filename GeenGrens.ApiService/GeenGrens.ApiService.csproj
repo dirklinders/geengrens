@@ -55,6 +55,9 @@
     <None Update="SqlScripts\manual_007_fix_cascade_all.sql">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="SqlScripts\manual_008_team_barname.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -14,6 +14,10 @@ public class TeamModel
     /// When true, this team gets access to the digital playtest notebook in the game UI.
     /// </summary>
     public bool IsPlaytest { get; set; }
+    /// <summary>
+    /// The name of the bar used in this team's story. Replaces {BarNaam} in character system prompts.
+    /// </summary>
+    public string? BarName { get; set; }
 
     public List<TeamProgressModel> TeamProgresss { get; set; } = [];
     public List<TeamUnlockModel> TeamUnlocks { get; set; } = [];
