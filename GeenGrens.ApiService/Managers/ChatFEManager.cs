@@ -123,8 +123,9 @@ public class ChatFEManager
             await _geenGrensContext.SaveChangesAsync(CancellationToken.None);
         }
 
-        // ── Phase 2: keyword-based stop-condition check (deterministic, no extra API call) ──
-        // Only runs when all three stop-keywords are configured on the character.
+        // ── Phase 2: stop-condition check ────────────────────────────────────────
+        // Keywords are a cheap gate: only do the model call when all three are present.
+        // The model then decides whether this is actually a natural end point.
         int userMessageCount = previousChats.Count(c => c.Role == "User") + 1;
 
         if (userMessageCount >= 5
@@ -134,21 +135,32 @@ public class ChatFEManager
             && !string.IsNullOrWhiteSpace(character.StopKeywordHint))
         {
             var combined = string.Join(" ",
-                previousChats
-                    .Where(c => c.Role == "Assistant")
-                    .Select(c => c.Message)
-                    .Append(assistantReply)
+                previousChats.Where(c => c.Role == "Assistant").Select(c => c.Message)
+                             .Append(assistantReply)
             ).ToLowerInvariant();
 
-            bool condAlibi      = combined.Contains(character.StopKeywordAlibi.ToLowerInvariant());
-            bool condConnection = combined.Contains(character.StopKeywordConnection.ToLowerInvariant());
-            bool condHint       = combined.Contains(character.StopKeywordHint.ToLowerInvariant());
+            bool keywordsAllMet =
+                combined.Contains(character.StopKeywordAlibi.ToLowerInvariant()) &&
+                combined.Contains(character.StopKeywordConnection.ToLowerInvariant()) &&
+                combined.Contains(character.StopKeywordHint.ToLowerInvariant());
 
-            if (condAlibi && condConnection && condHint)
+            if (keywordsAllMet)
             {
-                _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "System", Message = EndedMarker });
-                await _geenGrensContext.SaveChangesAsync(CancellationToken.None);
-                yield return new ChatStreamChunk(null, Ended: true);
+                // Keywords are met — ask the model if this is a natural end point.
+                // Append the assistant reply + hidden [check] trigger; model calls the
+                // tool only when the conversation genuinely feels finished.
+                messages.Add(new AssistantChatMessage(assistantReply));
+                messages.Add(new UserChatMessage("[check]"));
+
+                var checkResult = await _chatClient.CompleteChatAsync(messages, _toolOptions, cancellationToken);
+                bool conversationEnded = checkResult.Value.FinishReason == ChatFinishReason.ToolCalls;
+
+                if (conversationEnded)
+                {
+                    _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "System", Message = EndedMarker });
+                    await _geenGrensContext.SaveChangesAsync(CancellationToken.None);
+                    yield return new ChatStreamChunk(null, Ended: true);
+                }
             }
         }
     }
@@ -193,24 +205,30 @@ public class ChatFEManager
             }
         }
 
-        // Phase 2: keyword-based check — no message threshold in admin (check every turn)
+        // Phase 2: keywords as gate, model as quality check (same pattern as game path)
         if (!string.IsNullOrWhiteSpace(character.StopKeywordAlibi)
             && !string.IsNullOrWhiteSpace(character.StopKeywordConnection)
             && !string.IsNullOrWhiteSpace(character.StopKeywordHint))
         {
             var combined = string.Join(" ",
-                historyList
-                    .Where(m => m.Role == "Assistant")
-                    .Select(m => m.Content)
-                    .Append(fullResponse.ToString())
+                historyList.Where(m => m.Role == "Assistant").Select(m => m.Content)
+                           .Append(fullResponse.ToString())
             ).ToLowerInvariant();
 
-            bool condAlibi      = combined.Contains(character.StopKeywordAlibi.ToLowerInvariant());
-            bool condConnection = combined.Contains(character.StopKeywordConnection.ToLowerInvariant());
-            bool condHint       = combined.Contains(character.StopKeywordHint.ToLowerInvariant());
+            bool keywordsAllMet =
+                combined.Contains(character.StopKeywordAlibi.ToLowerInvariant()) &&
+                combined.Contains(character.StopKeywordConnection.ToLowerInvariant()) &&
+                combined.Contains(character.StopKeywordHint.ToLowerInvariant());
 
-            if (condAlibi && condConnection && condHint)
-                yield return new ChatStreamChunk(null, Ended: true);
+            if (keywordsAllMet)
+            {
+                messages.Add(new AssistantChatMessage(fullResponse.ToString()));
+                messages.Add(new UserChatMessage("[check]"));
+
+                var checkResult = await _chatClient.CompleteChatAsync(messages, _toolOptions, cancellationToken);
+                if (checkResult.Value.FinishReason == ChatFinishReason.ToolCalls)
+                    yield return new ChatStreamChunk(null, Ended: true);
+            }
         }
 
         // No DB writes
