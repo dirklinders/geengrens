@@ -144,7 +144,11 @@ public class ChatFEManager
                 combined.Contains(character.StopKeywordConnection.ToLowerInvariant()) &&
                 combined.Contains(character.StopKeywordHint.ToLowerInvariant());
 
-            if (keywordsAllMet)
+            // Skip the check if Danny's last response ends with a question —
+            // an open question is never a natural conversation end point.
+            bool endsWithQuestion = assistantReply.TrimEnd().EndsWith('?');
+
+            if (keywordsAllMet && !endsWithQuestion)
             {
                 // Keywords are met — ask the model if this is a natural end point.
                 // Append the assistant reply + hidden [check] trigger; model calls the
@@ -220,7 +224,9 @@ public class ChatFEManager
                 combined.Contains(character.StopKeywordConnection.ToLowerInvariant()) &&
                 combined.Contains(character.StopKeywordHint.ToLowerInvariant());
 
-            if (keywordsAllMet)
+            bool endsWithQuestion = fullResponse.ToString().TrimEnd().EndsWith('?');
+
+            if (keywordsAllMet && !endsWithQuestion)
             {
                 messages.Add(new AssistantChatMessage(fullResponse.ToString()));
                 messages.Add(new UserChatMessage("[check]"));
