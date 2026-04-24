@@ -98,13 +98,11 @@ public class ChatFEManager
         }
         messages.Add(new UserChatMessage(userInput));
 
-        // Stream from OpenAI with the stop-condition tool available
+        // ── Phase 1: stream text response (no tools → model always produces text) ──
         var fullResponse = new StringBuilder();
-        bool conversationEnded = false;
 
-        await foreach (var update in _chatClient.CompleteChatStreamingAsync(messages, _toolOptions, cancellationToken))
+        await foreach (var update in _chatClient.CompleteChatStreamingAsync(messages, cancellationToken: cancellationToken))
         {
-            // Stream text tokens
             foreach (var part in update.ContentUpdate)
             {
                 if (!string.IsNullOrEmpty(part.Text))
@@ -113,30 +111,37 @@ public class ChatFEManager
                     yield return new ChatStreamChunk(part.Text);
                 }
             }
-
-            // Detect tool call finish
-            if (update.FinishReason == ChatFinishReason.ToolCalls)
-                conversationEnded = true;
         }
 
-        // Persist to DB
         var assistantReply = fullResponse.ToString();
-        if (!string.IsNullOrEmpty(assistantReply) || conversationEnded)
+
+        // Persist user message + assistant reply to DB
+        if (!string.IsNullOrEmpty(assistantReply))
         {
             _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "User",      Message = userInput });
-
-            if (!string.IsNullOrEmpty(assistantReply))
-                _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "Assistant", Message = assistantReply });
-
-            if (conversationEnded)
-                _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "System",    Message = EndedMarker });
-
+            _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "Assistant", Message = assistantReply });
             await _geenGrensContext.SaveChangesAsync(CancellationToken.None);
         }
 
-        // Signal end to frontend after all text has been flushed
-        if (conversationEnded)
-            yield return new ChatStreamChunk(null, Ended: true);
+        // ── Phase 2: silent stop-condition check (not streamed, user never sees this) ──
+        // Only start checking from the 5th user message onwards to save tokens.
+        int userMessageCount = previousChats.Count(c => c.Role == "User") + 1; // +1 for current message
+
+        if (userMessageCount >= 5 && !string.IsNullOrEmpty(assistantReply))
+        {
+            messages.Add(new AssistantChatMessage(assistantReply));
+            messages.Add(new UserChatMessage("[check]"));
+
+            var checkResult = await _chatClient.CompleteChatAsync(messages, _toolOptions, cancellationToken);
+            bool conversationEnded = checkResult.Value.FinishReason == ChatFinishReason.ToolCalls;
+
+            if (conversationEnded)
+            {
+                _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "System", Message = EndedMarker });
+                await _geenGrensContext.SaveChangesAsync(CancellationToken.None);
+                yield return new ChatStreamChunk(null, Ended: true);
+            }
+        }
     }
 
     // ── Streaming – admin test chat (NO DB reads/writes, pure in-memory) ─────
@@ -161,22 +166,34 @@ public class ChatFEManager
         }
         messages.Add(new UserChatMessage(userInput));
 
-        bool conversationEnded = false;
+        // Phase 1: stream text (no tools)
+        var fullResponse = new StringBuilder();
 
-        await foreach (var update in _chatClient.CompleteChatStreamingAsync(messages, _toolOptions, cancellationToken))
+        await foreach (var update in _chatClient.CompleteChatStreamingAsync(messages, cancellationToken: cancellationToken))
         {
             foreach (var part in update.ContentUpdate)
             {
                 if (!string.IsNullOrEmpty(part.Text))
+                {
+                    fullResponse.Append(part.Text);
                     yield return new ChatStreamChunk(part.Text);
+                }
             }
-
-            if (update.FinishReason == ChatFinishReason.ToolCalls)
-                conversationEnded = true;
         }
 
-        if (conversationEnded)
-            yield return new ChatStreamChunk(null, Ended: true);
+        // Phase 2: silent check (only from 5th user message onwards)
+        var historyList = history.ToList();
+        int userMessageCount = historyList.Count(m => m.Role == "User") + 1; // +1 for current message
+
+        if (userMessageCount >= 5)
+        {
+            messages.Add(new AssistantChatMessage(fullResponse.ToString()));
+            messages.Add(new UserChatMessage("[check]"));
+
+            var checkResult = await _chatClient.CompleteChatAsync(messages, _toolOptions, cancellationToken);
+            if (checkResult.Value.FinishReason == ChatFinishReason.ToolCalls)
+                yield return new ChatStreamChunk(null, Ended: true);
+        }
 
         // No DB writes
     }
