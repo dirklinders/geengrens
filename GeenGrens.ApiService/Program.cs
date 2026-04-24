@@ -10,7 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddProblemDetails();
 
 var openAiKey = builder.Configuration["OpenAIKey"];
-builder.Services.AddSingleton(new ChatClient(model: "gpt-4o-mini", openAiKey));
+builder.Services.AddSingleton(new ChatClient(model: "gpt-5.4", openAiKey));
 builder.Services.AddScoped<ChatFEManager>();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
