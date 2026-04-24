@@ -13,6 +13,15 @@ public class CharacterModel
     public string AvatarUrl { get; set; } = string.Empty;
     public string? Personality { get; set; }
 
+    /// <summary>Keyword(s) to detect in assistant replies that confirm the alibi has been mentioned.</summary>
+    public string? StopKeywordAlibi { get; set; }
+
+    /// <summary>Keyword(s) to detect in assistant replies that confirm the connection has been mentioned.</summary>
+    public string? StopKeywordConnection { get; set; }
+
+    /// <summary>Keyword(s) to detect in assistant replies that confirm the hint has been mentioned.</summary>
+    public string? StopKeywordHint { get; set; }
+
     public List<ChatModel> Chats { get; set; } = [];
     public List<LocationCodeModel> LocationCodes { get; set; } = [];
 

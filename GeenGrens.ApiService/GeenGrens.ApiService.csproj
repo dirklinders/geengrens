@@ -58,6 +58,9 @@
     <None Update="SqlScripts\manual_008_team_barname.sql">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="SqlScripts\manual_009_character_stop_keywords.sql">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

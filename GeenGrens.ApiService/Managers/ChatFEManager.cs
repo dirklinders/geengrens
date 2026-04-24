@@ -123,19 +123,28 @@ public class ChatFEManager
             await _geenGrensContext.SaveChangesAsync(CancellationToken.None);
         }
 
-        // ── Phase 2: silent stop-condition check (not streamed, user never sees this) ──
-        // Only start checking from the 5th user message onwards to save tokens.
-        int userMessageCount = previousChats.Count(c => c.Role == "User") + 1; // +1 for current message
+        // ── Phase 2: keyword-based stop-condition check (deterministic, no extra API call) ──
+        // Only runs when all three stop-keywords are configured on the character.
+        int userMessageCount = previousChats.Count(c => c.Role == "User") + 1;
 
-        if (userMessageCount >= 5 && !string.IsNullOrEmpty(assistantReply))
+        if (userMessageCount >= 5
+            && !string.IsNullOrEmpty(assistantReply)
+            && !string.IsNullOrWhiteSpace(character.StopKeywordAlibi)
+            && !string.IsNullOrWhiteSpace(character.StopKeywordConnection)
+            && !string.IsNullOrWhiteSpace(character.StopKeywordHint))
         {
-            messages.Add(new AssistantChatMessage(assistantReply));
-            messages.Add(new UserChatMessage("[check]"));
+            var combined = string.Join(" ",
+                previousChats
+                    .Where(c => c.Role == "Assistant")
+                    .Select(c => c.Message)
+                    .Append(assistantReply)
+            ).ToLowerInvariant();
 
-            var checkResult = await _chatClient.CompleteChatAsync(messages, _toolOptions, cancellationToken);
-            bool conversationEnded = checkResult.Value.FinishReason == ChatFinishReason.ToolCalls;
+            bool condAlibi      = combined.Contains(character.StopKeywordAlibi.ToLowerInvariant());
+            bool condConnection = combined.Contains(character.StopKeywordConnection.ToLowerInvariant());
+            bool condHint       = combined.Contains(character.StopKeywordHint.ToLowerInvariant());
 
-            if (conversationEnded)
+            if (condAlibi && condConnection && condHint)
             {
                 _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "System", Message = EndedMarker });
                 await _geenGrensContext.SaveChangesAsync(CancellationToken.None);
@@ -156,9 +165,12 @@ public class ChatFEManager
         if (character == null)
             throw new Exception("Character not found");
 
+        // Materialise once so we can iterate multiple times
+        var historyList = history.ToList();
+
         var messages = new List<ChatMessage> { new SystemChatMessage(character.SystemPrompt) };
 
-        foreach (var msg in history)
+        foreach (var msg in historyList)
         {
             messages.Add(msg.Role == "User"
                 ? new UserChatMessage(msg.Content)
@@ -181,17 +193,23 @@ public class ChatFEManager
             }
         }
 
-        // Phase 2: silent check (only from 5th user message onwards)
-        var historyList = history.ToList();
-        int userMessageCount = historyList.Count(m => m.Role == "User") + 1; // +1 for current message
-
-        if (userMessageCount >= 5)
+        // Phase 2: keyword-based check — no message threshold in admin (check every turn)
+        if (!string.IsNullOrWhiteSpace(character.StopKeywordAlibi)
+            && !string.IsNullOrWhiteSpace(character.StopKeywordConnection)
+            && !string.IsNullOrWhiteSpace(character.StopKeywordHint))
         {
-            messages.Add(new AssistantChatMessage(fullResponse.ToString()));
-            messages.Add(new UserChatMessage("[check]"));
+            var combined = string.Join(" ",
+                historyList
+                    .Where(m => m.Role == "Assistant")
+                    .Select(m => m.Content)
+                    .Append(fullResponse.ToString())
+            ).ToLowerInvariant();
 
-            var checkResult = await _chatClient.CompleteChatAsync(messages, _toolOptions, cancellationToken);
-            if (checkResult.Value.FinishReason == ChatFinishReason.ToolCalls)
+            bool condAlibi      = combined.Contains(character.StopKeywordAlibi.ToLowerInvariant());
+            bool condConnection = combined.Contains(character.StopKeywordConnection.ToLowerInvariant());
+            bool condHint       = combined.Contains(character.StopKeywordHint.ToLowerInvariant());
+
+            if (condAlibi && condConnection && condHint)
                 yield return new ChatStreamChunk(null, Ended: true);
         }
 
