@@ -50,7 +50,9 @@ public class ChatFEController(
         {
             await foreach (var chunk in _chatManager.StreamAsync(characterId, question, teamId, cancellationToken))
             {
-                var payload = JsonSerializer.Serialize(new { text = chunk });
+                string payload = chunk.Ended
+                    ? JsonSerializer.Serialize(new { ended = true })
+                    : JsonSerializer.Serialize(new { text = chunk.Text });
                 await Response.WriteAsync($"data: {payload}\n\n", cancellationToken);
                 await Response.Body.FlushAsync(cancellationToken);
             }
@@ -89,7 +91,9 @@ public class ChatFEController(
             await foreach (var chunk in _chatManager.StreamAdminTestAsync(
                 request.CharacterId, request.Question, request.History, cancellationToken))
             {
-                var payload = JsonSerializer.Serialize(new { text = chunk });
+                string payload = chunk.Ended
+                    ? JsonSerializer.Serialize(new { ended = true })
+                    : JsonSerializer.Serialize(new { text = chunk.Text });
                 await Response.WriteAsync($"data: {payload}\n\n", cancellationToken);
                 await Response.Body.FlushAsync(cancellationToken);
             }

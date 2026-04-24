@@ -1,11 +1,19 @@
 
 using OpenAI.Chat;
 using System.Runtime.CompilerServices;
+using System.Text;
+using System.Text.Json;
 
 namespace GeenGrens.ApiService.Managers;
 
 public record ChatDTOREcord(string Role, string Message);
 public record AdminMessageDTO(string Role, string Content);
+
+/// <summary>
+/// A single chunk yielded by StreamAsync / StreamAdminTestAsync.
+/// Either carries a text token OR signals that the AI ended the conversation.
+/// </summary>
+public record ChatStreamChunk(string? Text, bool Ended = false);
 
 public class ChatFEManager
 {
@@ -29,9 +37,32 @@ public class ChatFEManager
         return chats.Select(x => new ChatDTOREcord(x.Role, x.Message)).ToList();
     }
 
+    // ── Stop-condition tool ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Marker written to DB (Role = "System") when the AI ends the conversation.
+    /// The frontend checks for this on load to restore the ended state.
+    /// </summary>
+    public const string EndedMarker = "[BEËINDIGD]";
+
+    /// <summary>
+    /// The OpenAI function tool that the character can call to end the conversation.
+    /// Define its trigger conditions in the system prompt under "system call".
+    /// </summary>
+    private static readonly ChatTool _endConversationTool = ChatTool.CreateFunctionTool(
+        functionName: "beeindig_gesprek",
+        functionDescription: "Beëindigt het gesprek op een natuurlijk eindpunt. Roep aan als sluitende actie nadat je je afsluitende tekst hebt geschreven.",
+        functionParameters: BinaryData.FromString("""{"type":"object","properties":{},"required":[]}""")
+    );
+
+    private static readonly ChatCompletionOptions _toolOptions = new()
+    {
+        Tools = { _endConversationTool }
+    };
+
     // ── Streaming – team chat (saves to DB after stream completes) ───────────
 
-    public async IAsyncEnumerable<string> StreamAsync(
+    public async IAsyncEnumerable<ChatStreamChunk> StreamAsync(
         int characterId,
         string userInput,
         int? teamId,
@@ -51,16 +82,13 @@ public class ChatFEManager
         }
         var systemPrompt = (character.SystemPrompt ?? "").Replace("{BarNaam}", barName);
 
-        // Build message history from DB
+        // Build message history from DB (skip system-role markers)
         var previousChats = _geenGrensContext.Chats
-            .Where(x => x.CharacterId == characterId && x.TeamId == teamId)
+            .Where(x => x.CharacterId == characterId && x.TeamId == teamId && x.Role != "System")
             .OrderBy(x => x.Id)
             .ToList();
 
-        var messages = new List<ChatMessage>
-        {
-            new SystemChatMessage(systemPrompt)
-        };
+        var messages = new List<ChatMessage> { new SystemChatMessage(systemPrompt) };
 
         foreach (var chat in previousChats)
         {
@@ -70,46 +98,50 @@ public class ChatFEManager
         }
         messages.Add(new UserChatMessage(userInput));
 
-        // Stream from OpenAI
-        var fullResponse = new System.Text.StringBuilder();
+        // Stream from OpenAI with the stop-condition tool available
+        var fullResponse = new StringBuilder();
+        bool conversationEnded = false;
 
-        await foreach (var update in _chatClient.CompleteChatStreamingAsync(messages, cancellationToken: cancellationToken))
+        await foreach (var update in _chatClient.CompleteChatStreamingAsync(messages, _toolOptions, cancellationToken))
         {
+            // Stream text tokens
             foreach (var part in update.ContentUpdate)
             {
                 if (!string.IsNullOrEmpty(part.Text))
                 {
                     fullResponse.Append(part.Text);
-                    yield return part.Text;
+                    yield return new ChatStreamChunk(part.Text);
                 }
             }
+
+            // Detect tool call finish
+            if (update.FinishReason == ChatFinishReason.ToolCalls)
+                conversationEnded = true;
         }
 
-        // Save both messages to DB after stream completes
+        // Persist to DB
         var assistantReply = fullResponse.ToString();
-        if (!string.IsNullOrEmpty(assistantReply))
+        if (!string.IsNullOrEmpty(assistantReply) || conversationEnded)
         {
-            _geenGrensContext.Chats.Add(new ChatModel
-            {
-                CharacterId = characterId,
-                TeamId = teamId,
-                Role = "User",
-                Message = userInput
-            });
-            _geenGrensContext.Chats.Add(new ChatModel
-            {
-                CharacterId = characterId,
-                TeamId = teamId,
-                Role = "Assistant",
-                Message = assistantReply
-            });
+            _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "User",      Message = userInput });
+
+            if (!string.IsNullOrEmpty(assistantReply))
+                _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "Assistant", Message = assistantReply });
+
+            if (conversationEnded)
+                _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "System",    Message = EndedMarker });
+
             await _geenGrensContext.SaveChangesAsync(CancellationToken.None);
         }
+
+        // Signal end to frontend after all text has been flushed
+        if (conversationEnded)
+            yield return new ChatStreamChunk(null, Ended: true);
     }
 
     // ── Streaming – admin test chat (NO DB reads/writes, pure in-memory) ─────
 
-    public async IAsyncEnumerable<string> StreamAdminTestAsync(
+    public async IAsyncEnumerable<ChatStreamChunk> StreamAdminTestAsync(
         int characterId,
         string userInput,
         IEnumerable<AdminMessageDTO> history,
@@ -119,10 +151,7 @@ public class ChatFEManager
         if (character == null)
             throw new Exception("Character not found");
 
-        var messages = new List<ChatMessage>
-        {
-            new SystemChatMessage(character.SystemPrompt)
-        };
+        var messages = new List<ChatMessage> { new SystemChatMessage(character.SystemPrompt) };
 
         foreach (var msg in history)
         {
@@ -132,14 +161,23 @@ public class ChatFEManager
         }
         messages.Add(new UserChatMessage(userInput));
 
-        await foreach (var update in _chatClient.CompleteChatStreamingAsync(messages, cancellationToken: cancellationToken))
+        bool conversationEnded = false;
+
+        await foreach (var update in _chatClient.CompleteChatStreamingAsync(messages, _toolOptions, cancellationToken))
         {
             foreach (var part in update.ContentUpdate)
             {
                 if (!string.IsNullOrEmpty(part.Text))
-                    yield return part.Text;
+                    yield return new ChatStreamChunk(part.Text);
             }
+
+            if (update.FinishReason == ChatFinishReason.ToolCalls)
+                conversationEnded = true;
         }
+
+        if (conversationEnded)
+            yield return new ChatStreamChunk(null, Ended: true);
+
         // No DB writes
     }
 }
