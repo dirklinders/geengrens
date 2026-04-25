@@ -89,7 +89,7 @@ public class ChatFEController(
         try
         {
             await foreach (var chunk in _chatManager.StreamAdminTestAsync(
-                request.CharacterId, request.Question, request.History, cancellationToken))
+                request.CharacterId, request.Question, request.History, request.ClosingRequested, cancellationToken))
             {
                 string payload = chunk.Ended
                     ? JsonSerializer.Serialize(new { ended = true })
@@ -109,6 +109,16 @@ public class ChatFEController(
         }
     }
 
+    // ── Admin: request graceful conversation close ────────────────────────────
+
+    [HttpPost("request-end")]
+    public async Task<IActionResult> RequestEnd([FromBody] RequestEndDto dto)
+    {
+        if (!IsAdmin()) return Forbid();
+        var inserted = await _chatManager.RequestEndAsync(dto.CharacterId, dto.TeamId);
+        return Ok(new { success = inserted, alreadyDone = !inserted });
+    }
+
     // ── DTOs ──────────────────────────────────────────────────────────────────
 
     public class AdminTestStreamRequest
@@ -116,5 +126,12 @@ public class ChatFEController(
         public int CharacterId { get; set; }
         public string Question { get; set; } = string.Empty;
         public List<AdminMessageDTO> History { get; set; } = [];
+        public bool ClosingRequested { get; set; } = false;
+    }
+
+    public class RequestEndDto
+    {
+        public int CharacterId { get; set; }
+        public int TeamId { get; set; }
     }
 }

@@ -46,6 +46,40 @@ public class ChatFEManager
     public const string EndedMarker = "[BEËINDIGD]";
 
     /// <summary>
+    /// Marker written to DB (Role = "System") by the admin to request a graceful wrap-up.
+    /// On the next player message the character closes the conversation and EndedMarker is written.
+    /// </summary>
+    public const string SluitAfMarker = "[SLUIT_AF]";
+
+    /// <summary>
+    /// Admin-triggered: inserts the SluitAfMarker for a team+character chat.
+    /// No-ops if the conversation is already ended or a close was already requested.
+    /// Returns true when the marker was inserted.
+    /// </summary>
+    public async Task<bool> RequestEndAsync(int characterId, int teamId)
+    {
+        bool alreadyEnded = _geenGrensContext.Chats
+            .Any(x => x.CharacterId == characterId && x.TeamId == teamId
+                      && x.Role == "System" && x.Message == EndedMarker);
+        if (alreadyEnded) return false;
+
+        bool alreadyRequested = _geenGrensContext.Chats
+            .Any(x => x.CharacterId == characterId && x.TeamId == teamId
+                      && x.Role == "System" && x.Message == SluitAfMarker);
+        if (alreadyRequested) return false;
+
+        _geenGrensContext.Chats.Add(new ChatModel
+        {
+            CharacterId = characterId,
+            TeamId = teamId,
+            Role = "System",
+            Message = SluitAfMarker
+        });
+        await _geenGrensContext.SaveChangesAsync();
+        return true;
+    }
+
+    /// <summary>
     /// The OpenAI function tool that the character can call to end the conversation.
     /// Define its trigger conditions in the system prompt under "system call".
     /// </summary>
@@ -81,6 +115,16 @@ public class ChatFEManager
                 barName = team.BarName;
         }
         var systemPrompt = (character.SystemPrompt ?? "").Replace("{BarNaam}", barName);
+
+        // ── Check for admin-requested graceful close ──────────────────────────────
+        bool closingRequested = teamId.HasValue && _geenGrensContext.Chats
+            .Any(x => x.CharacterId == characterId && x.TeamId == teamId
+                      && x.Role == "System" && x.Message == SluitAfMarker);
+
+        if (closingRequested)
+        {
+            systemPrompt += "\n\n[AFSLUITINGSINSTRUCTIE: De spelleider heeft besloten dit gesprek te beëindigen. Dit is jouw laatste reactie. Reageer kort op het laatste bericht van de speler, neem dan vriendelijk maar definitief afscheid in jouw eigen stijl. Stel geen nieuwe vragen. Sluit af.]";
+        }
 
         // Build message history from DB (skip system-role markers)
         var previousChats = _geenGrensContext.Chats
@@ -121,6 +165,15 @@ public class ChatFEManager
             _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "User",      Message = userInput });
             _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "Assistant", Message = assistantReply });
             await _geenGrensContext.SaveChangesAsync(CancellationToken.None);
+        }
+
+        // ── Admin-requested close: lock the conversation and skip Phase 2 ─────────
+        if (closingRequested && !string.IsNullOrEmpty(assistantReply))
+        {
+            _geenGrensContext.Chats.Add(new ChatModel { CharacterId = characterId, TeamId = teamId, Role = "System", Message = EndedMarker });
+            await _geenGrensContext.SaveChangesAsync(CancellationToken.None);
+            yield return new ChatStreamChunk(null, Ended: true);
+            yield break;
         }
 
         // ── Phase 2: stop-condition check ────────────────────────────────────────
@@ -175,6 +228,7 @@ public class ChatFEManager
         int characterId,
         string userInput,
         IEnumerable<AdminMessageDTO> history,
+        bool closingRequested = false,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var character = await _geenGrensContext.Characters.FindAsync([characterId], cancellationToken);
@@ -184,7 +238,13 @@ public class ChatFEManager
         // Materialise once so we can iterate multiple times
         var historyList = history.ToList();
 
-        var messages = new List<ChatMessage> { new SystemChatMessage(character.SystemPrompt) };
+        var testSystemPrompt = character.SystemPrompt ?? string.Empty;
+        if (closingRequested)
+        {
+            testSystemPrompt += "\n\n[AFSLUITINGSINSTRUCTIE: De spelleider heeft besloten dit gesprek te beëindigen. Dit is jouw laatste reactie. Reageer kort op het laatste bericht van de speler, neem dan vriendelijk maar definitief afscheid in jouw eigen stijl. Stel geen nieuwe vragen. Sluit af.]";
+        }
+
+        var messages = new List<ChatMessage> { new SystemChatMessage(testSystemPrompt) };
 
         foreach (var msg in historyList)
         {
@@ -207,6 +267,13 @@ public class ChatFEManager
                     yield return new ChatStreamChunk(part.Text);
                 }
             }
+        }
+
+        // If admin requested close in test mode, skip Phase 2 and signal ended
+        if (closingRequested)
+        {
+            yield return new ChatStreamChunk(null, Ended: true);
+            yield break;
         }
 
         // Phase 2: keywords as gate, model as quality check (same pattern as game path)
