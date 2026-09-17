@@ -1,4 +1,4 @@
-﻿namespace GeenGrens.CrudGenerator;
+﻿namespace Muntonrecht.CrudGenerator;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -19,13 +19,13 @@ public class CrudGenerator : IIncrementalGenerator
 
         var models = context.SyntaxProvider
             .ForAttributeWithMetadataName(
-                "GeenGrens.ApiService.GenerateCrudAttribute",
+                "Muntonrecht.ApiService.GenerateCrudAttribute",
                 static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, _) =>
                 {
                     var symbol = (INamedTypeSymbol)ctx.TargetSymbol;
 
-                    if (symbol.ContainingNamespace.ToDisplayString() != "GeenGrens.ApiService.Models")
+                    if (symbol.ContainingNamespace.ToDisplayString() != "Muntonrecht.ApiService.Models")
                         return null;
 
                     var attribute = ctx.Attributes[0];
@@ -69,7 +69,7 @@ public class CrudGenerator : IIncrementalGenerator
         if (symbol == null)
             return null;
 
-        if (symbol.ContainingNamespace.ToDisplayString() != "GeenGrens.ApiService.Models")
+        if (symbol.ContainingNamespace.ToDisplayString() != "Muntonrecht.ApiService.Models")
             return null;
 
         foreach (var attr in symbol.GetAttributes())
@@ -94,8 +94,18 @@ public class CrudGenerator : IIncrementalGenerator
         return null;
     }
 
-    private static bool  IsSimpleType(ITypeSymbol type)
+    private static bool IsSimpleType(ITypeSymbol type)
     {
+        // Nullable value types (e.g. int?) have SpecialType.System_Nullable_T, NOT
+        // the underlying type's SpecialType. Without unwrapping them here, nullable
+        // FK properties (int? CharacterId) would silently vanish from the generated
+        // DTO and AutoMapper would insert default 0 instead of NULL.
+        if (type is INamedTypeSymbol namedType &&
+            namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+        {
+            return IsSimpleType(namedType.TypeArguments[0]);
+        }
+
         switch (type.SpecialType)
         {
             case SpecialType.System_String:
@@ -115,15 +125,9 @@ public class CrudGenerator : IIncrementalGenerator
 
     private static string GetTypeName(ITypeSymbol type)
     {
+        // type.ToString() renders nullable value types as "int?" etc., so
+        // nullability flows into the generated DTO unchanged.
         return type.ToString();
-
-        var typeName = type.Name;
-
-        // Nullable handling
-        if (type.NullableAnnotation == NullableAnnotation.Annotated && type.IsValueType)
-            return typeName + "?";
-
-        return typeName;
     }
 
     static string Generate(SourceProductionContext context, ModelInfo model)
@@ -143,7 +147,7 @@ public class CrudGenerator : IIncrementalGenerator
         var dtoName = model.Name.Replace("Model", "DTO");
 
         var sb = new StringBuilder();
-        sb.AppendLine($"namespace GeenGrens.ApiService.Generated;");
+        sb.AppendLine($"namespace Muntonrecht.ApiService.Generated;");
         sb.AppendLine();
         sb.AppendLine($"public class {dtoName}");
         sb.AppendLine("{");
@@ -166,10 +170,10 @@ public class CrudGenerator : IIncrementalGenerator
 
 public class {{managerName}}
 {
-    private readonly GeenGrensContext _context;
+    private readonly MuntonrechtContext _context;
     private readonly IMapper _mapper;
 
-    public {{managerName}}(GeenGrensContext context, IMapper mapper)
+    public {{managerName}}(MuntonrechtContext context, IMapper mapper)
     {
         _context = context;
         _mapper = mapper;
@@ -269,7 +273,7 @@ public class {{controllerName}} : ControllerBase
         var source = $$"""
 
 
-namespace GeenGrens.ApiService.Generated;
+namespace Muntonrecht.ApiService.Generated;
 
 public static class GeneratedCrudServiceExtensions
 {
@@ -292,11 +296,11 @@ public static class GeneratedCrudServiceExtensions
 
         var source = $$"""
 
-namespace GeenGrens.ApiService.Context;
+namespace Muntonrecht.ApiService.Context;
 
-public class GeenGrensProfile : Profile
+public class MuntonrechtProfile : Profile
 {
-    public GeenGrensProfile()
+    public MuntonrechtProfile()
     {
         {{registrations}}
     }
@@ -307,7 +311,7 @@ public class GeenGrensProfile : Profile
 
 
 
-        context.AddSource("GeenGrensProfile.g.cs", source);
+        context.AddSource("MuntonrechtProfile.g.cs", source);
     }
 
     static void GenerateDbSets(SourceProductionContext context, ImmutableArray<ModelInfo> models)
@@ -402,9 +406,9 @@ public class GeenGrensProfile : Profile
 
         var source = $$"""
 
-namespace GeenGrens.ApiService.Context;
+namespace Muntonrecht.ApiService.Context;
 
-public partial class GeenGrensContext
+public partial class MuntonrechtContext
 {
 {{dbsets}}
 
@@ -417,7 +421,7 @@ public partial class GeenGrensContext
 }
 """;
 
-        context.AddSource("GeenGrensContext.DbSets.g.cs", source);
+        context.AddSource("MuntonrechtContext.DbSets.g.cs", source);
     }
 
 
@@ -439,16 +443,16 @@ public partial class GeenGrensContext
 
     //        var source = $$"""
     //using Microsoft.EntityFrameworkCore;
-    //using GeenGrens.ApiService.Models;
-    //namespace GeenGrens.ApiService.Context;
+    //using Muntonrecht.ApiService.Models;
+    //namespace Muntonrecht.ApiService.Context;
 
-    //public partial class GeenGrensContext
+    //public partial class MuntonrechtContext
     //{
     //{{sb}}
     //}
     //""";
 
-    //        context.AddSource("GeenGrensContext.DbSets.g.cs", source);
+    //        context.AddSource("MuntonrechtContext.DbSets.g.cs", source);
     //    }
 
     class ModelInfo

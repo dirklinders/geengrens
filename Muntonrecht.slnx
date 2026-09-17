@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Project Path="CrudGenerator/CrudGenerator.csproj" Id="f1c6d6c2-ad3f-419d-ae6e-56d45ae4bc93" />
+  <Project Path="Muntonrecht.ApiService/Muntonrecht.ApiService.csproj" />
+</Solution>
