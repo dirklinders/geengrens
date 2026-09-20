@@ -177,16 +177,14 @@ public class GameElementController(
         var team = await dbContext.Teams.FindAsync(user.TeamId);
         var progress = await GetOrCreateTeamProgress(user.TeamId);
 
-        var unlockedLocations = await dbContext.TeamUnlocks
-            .CountAsync(u => u.TeamId == user.TeamId);
-        var totalLocations = await dbContext.Locations.CountAsync();
+        var visits = await LocationVisitProgress.GetAsync(dbContext, user.TeamId);
 
         return Ok(new
         {
             canAccessChat = progress.CanAccessChat,
-            canSubmitTip = progress.CanSubmitTip,
-            unlockedLocations,
-            totalLocations,
+            canSubmitTip = visits.Total > 0 && visits.Visited == visits.Total,
+            unlockedLocations = visits.Visited,
+            totalLocations = visits.Total,
             isPlaytest = team?.IsPlaytest ?? false,
             barName = team?.BarName,
             introSeen = progress.IntroSeenAt != null,

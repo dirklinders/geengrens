@@ -6,31 +6,18 @@ namespace Muntonrecht.ApiService.Models;
 /// </summary>
 public static class GameDefaults
 {
-    public const string SpeluitlegTitle = "De Zaak-Muntonrecht";
+    public const string SpeluitlegTitle = "De Zaak Thieme";
 
     public const string SpeluitlegBackstory =
         """
-        Zutphen, de nacht van zaterdag op zondag. Tegen beter zeggen in kwam Viktor Vermeer — zakenman, wereldreiziger en de man rond wie heel Muntonrecht draaide — terug naar de stad. Hij had afspraken, rekeningen en oude vetes. Voor middernacht was het voorbij: Viktor werd dood gevonden.
+        In 2001 werd het lichaam van Willem Thieme in Zutphen uit het water gehaald. Er waren nauwelijks aanknopingspunten. Nu de onderzoekstermijn van 25 jaar voor deze cold case bijna verstreken is, doet de politie een laatste oproep aan het publiek: help de zaak op te lossen.
 
-        Maar de zaak klopt van geen kant. Op de plek waar het lichaam lag is veel te weinig bloed gevonden. Rechercheur De Groot is er stellig van overtuigd: Viktor is niet dáár vermoord. Zijn lichaam is na de daad verplaatst. En dat betekent dat de dader tijd, ruimte én een reden had om de sporen te verwarren.
+        Zeven mogelijke moordlocaties, zeven verdachten — van wie één nergens bij naam wordt genoemd — en zeven mogelijke moordwapens. Achterhaal wie zich in de nacht van 10 oktober 2001 waar bevond en welk mogelijk wapen diegene bij zich droeg. Misschien komt de moordenaar zo vanzelf aan het licht.
 
-        De politie zit met de handen in het haar. Jullie niet. Jullie zijn de Zaak-Muntonrecht: één avond, één stad, en verdachten die allemaal een reden hadden om te willen dat Viktor Vermeer verdween. Wie deed het, met welk wapen — en waar vond de moord écht plaats?
+        De politie heeft alle informatie vrijgegeven die zij wettelijk mag delen. De dossiers liggen klaar. Het onderzoek is aan jullie. Veel succes.
         """;
 
-    public const string SpeluitlegRules =
-        """
-        Eén team, één kans. Zo werken jullie onderzoek:
-
-        1. Open de kaart. Elke locatie in de binnenstad huisvest één verdachte.
-
-        2. Ga naar de locatie en scant daar de QR-code of NFC-tag. Daarmee ontgrendelen jullie het gesprek met de verdachte op die plek.
-
-        3. Stel vragen en luister goed. Verdachten laten vanzelf aanwijzingen vallen over wie wat deed, welk voorwerp een rol speelde en waar het écht gebeurde — maar niet iedereen is eerlijk. Por ze, wieg ze, en vergelijk hun verhalen met elkaar.
-
-        4. Zodra jullie álle locaties hebben ontgrendeld, mogen jullie één definitieve aanklacht indienen: wie was de dader, welk wapen werd gebruikt, en op welke plek vond de moord plaats?
-
-        5. Een foutieve aanklacht betekent dat de dader vrijuit gaat. Denk goed na voordat jullie indienen.
-        """;
+    public const string SpeluitlegRules = RulesBody;
 
     public const string IntroTitle = "Telegram uit het politiebureau";
 
@@ -58,15 +45,15 @@ public static class GameDefaults
 
     public const string RulesBody =
         """
-        Eén team, één kans. Zo werken jullie onderzoek:
+        Eén team, één kans. Zo werkt jullie onderzoek:
 
-        1. Open de kaart. Elke locatie in de binnenstad huisvest één verdachte.
+        1. Open de kaart. Elke locatie bevat informatie van de politie.
 
-        2. Ga naar de locatie en scan daar de QR-code of NFC-tag. Daarmee ontgrendelen jullie het dossier van die locatie: een politieverklaring of een zoekfoto met vondsten.
+        2. Ga naar de locatie en scan daar de NFC-tag. Daarmee ontgrendelen jullie het dossier van die locatie.
 
-        3. Lees goed. In verklaringen zijn delen gezwart — wat eronder staat, blijft verborgen. Vergelijk de verhalen met elkaar: niet iedereen is eerlijk.
+        3. Lees goed. In verklaringen zijn delen zwart gelakt — wat eronder staat, blijft verborgen.
 
-        4. Houd het logigram bij. Zet een kruis bij wat uitgesloten is en een vinkje bij wat vaststaat. De aanwijzingen helpen jullie op weg.
+        4. Houd het logigram bij. Zet een kruis bij wat uitgesloten is en een vinkje bij wat vaststaat. De dossiers helpen jullie op weg.
 
         5. Zodra jullie álle locaties hebben ontgrendeld, mogen jullie één definitieve aanklacht indienen: wie was de dader, welk wapen werd gebruikt, en op welke plek vond de moord plaats?
 

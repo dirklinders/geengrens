@@ -36,6 +36,11 @@ public static class LogigramSyncManager
     public static async Task<LogigramSyncResult> SyncFromGameElementsAsync(MuntonrechtContext db)
     {
         // ── 1. Ensure the three standard categories exist ────────────────────
+        // Serialize the full sync across requests and API instances, including entries.
+        // The database releases this lock on commit or rollback.
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        await db.Database.ExecuteSqlRawAsync("SELECT pg_advisory_xact_lock(714203, 1)");
+
         var categories = await db.LogigramCategorys.ToListAsync();
         var categoriesChanged = false;
         foreach (var (key, name, sortOrder) in StandardCategories)
@@ -58,7 +63,7 @@ public static class LogigramSyncManager
 
         void SyncCategory(string key, List<SourceEntity> source)
         {
-            // With duplicate keys, the first standard category wins.
+            // Category keys are unique (manual_020).
             var category = categories
                 .Where(c => c.Key == key)
                 .OrderBy(c => c.SortOrder).ThenBy(c => c.Id)
@@ -149,6 +154,8 @@ public static class LogigramSyncManager
             locations.Select(l => new SourceEntity(l.Id, l.Name, null)).ToList());
 
         await db.SaveChangesAsync();
+
+        await transaction.CommitAsync();
 
         return new LogigramSyncResult(created, updated, deleted, adopted);
     }

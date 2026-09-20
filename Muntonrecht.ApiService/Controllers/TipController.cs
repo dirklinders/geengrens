@@ -45,7 +45,8 @@ public class TipController(
         var progress = await dbContext.TeamProgresss
             .FirstOrDefaultAsync(p => p.TeamId == teamId);
 
-        if (progress == null || !progress.CanSubmitTip)
+        var visits = await LocationVisitProgress.GetAsync(dbContext, teamId);
+        if (progress == null || visits.Total == 0 || visits.Visited != visits.Total)
             return Forbid();
 
         // Return cached result if already submitted
