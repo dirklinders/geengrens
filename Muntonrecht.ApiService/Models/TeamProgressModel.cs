@@ -18,6 +18,9 @@ public class TeamProgressModel
     /// <summary>Whether the team can submit an anonymous tip to the police</summary>
     public bool CanSubmitTip { get; set; }
 
+    /// <summary>Set by the organisation cheat code to expose every map location.</summary>
+    public bool AllLocationsUnlocked { get; set; }
+
     /// <summary>Whether the team has already submitted their final tip</summary>
     public bool TipSubmitted { get; set; }
 

@@ -71,10 +71,13 @@ public class AuthController(
 
             return Ok(new
             {
+                id = user!.Id,
                 isAuthenticated = true,
                 email = user!.Email,
                 name = user.FullName,
+                teamId = user.TeamId,
                 teamName,
+                teamLocked = user.TeamId > 0 && (await _dbContext.Teams.FindAsync(user.TeamId))?.IsLocked == true,
                 isAdmin,
             });
         }

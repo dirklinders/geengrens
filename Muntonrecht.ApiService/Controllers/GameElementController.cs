@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace Muntonrecht.ApiService.Controllers;
 
@@ -10,6 +11,8 @@ public class GameElementController(
     UserManager<UserModel> userManager,
     MuntonrechtContext dbContext) : ControllerBase
 {
+    private static readonly Regex RedactedSpan = new(@"\[\[[\s\S]*?\]\]", RegexOptions.Compiled);
+
     // ────────────────────────────────────────────────────────────
     // Helpers
     // ────────────────────────────────────────────────────────────
@@ -54,40 +57,49 @@ public class GameElementController(
         var progress = await dbContext.TeamProgresss
             .FirstOrDefaultAsync(p => p.TeamId == teamId);
 
+        if (progress?.AllLocationsUnlocked == true)
+            return (await dbContext.Locations.Select(l => l.Id).ToListAsync()).ToHashSet();
+
         if (progress?.LocationId is int assignedLocationId)
             unlockedLocationIds.Add(assignedLocationId);
 
         return unlockedLocationIds.ToHashSet();
     }
 
+    /// <summary>
+    /// Removes the actual text behind player-facing interview redactions before
+    /// the content leaves the server. The brackets remain so the frontend can
+    /// render the same black bar without receiving the secret.
+    /// </summary>
+    private static JsonNode RedactInterviewContent(JsonNode content)
+    {
+        if (content is JsonObject obj)
+        {
+            foreach (var property in obj)
+            {
+                if (property.Value != null)
+                    RedactInterviewContent(property.Value);
+            }
+        }
+        else if (content is JsonArray array)
+        {
+            foreach (var item in array)
+            {
+                if (item != null)
+                    RedactInterviewContent(item);
+            }
+        }
+        else if (content is JsonValue value && value.TryGetValue<string>(out var text) && text != null)
+        {
+            value.ReplaceWith(RedactedSpan.Replace(text, "[[aaaaaa]]"));
+        }
+
+        return content;
+    }
+
     // ────────────────────────────────────────────────────────────
     // Endpoints
     // ────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Returns the speluitleg (title, backstory, rules) for the home page.
-    /// Falls back to the built-in GameDefaults when the admin has not
-    /// configured custom texts in GameSettings.
-    /// </summary>
-    [Authorize]
-    [HttpGet("Speluitleg")]
-    public async Task<IActionResult> Speluitleg()
-    {
-        var settings = await dbContext.GameSettings.FirstOrDefaultAsync();
-
-        return Ok(new
-        {
-            title = !string.IsNullOrWhiteSpace(settings?.SpeluitlegTitle)
-                ? settings.SpeluitlegTitle
-                : GameDefaults.SpeluitlegTitle,
-            backstory = !string.IsNullOrWhiteSpace(settings?.SpeluitlegBackstory)
-                ? settings.SpeluitlegBackstory
-                : GameDefaults.SpeluitlegBackstory,
-            rules = !string.IsNullOrWhiteSpace(settings?.SpeluitlegRules)
-                ? settings.SpeluitlegRules
-                : GameDefaults.SpeluitlegRules,
-        });
-    }
 
     /// <summary>
     /// Returns all locations for the map page, including the suspect found at
@@ -123,6 +135,8 @@ public class GameElementController(
                 try
                 {
                     content = JsonNode.Parse(l.ContentJson);
+                    if (content != null && l.ContentType == "interview")
+                        content = RedactInterviewContent(content);
                 }
                 catch (JsonException)
                 {

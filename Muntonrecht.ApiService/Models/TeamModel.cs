@@ -13,6 +13,13 @@ public class TeamModel
     /// The name of the bar used in this team's story. Replaces {BarNaam} in character system prompts.
     /// </summary>
     public string? BarName { get; set; }
+    /// <summary>
+    /// Set when this team begins the investigation. Players can no longer join
+    /// or switch this team; administrators retain full team management access.
+    /// </summary>
+    public bool IsLocked { get; set; }
+    /// <summary>The player who created this team; used to limit players to one team creation.</summary>
+    public string? CreatedByUserId { get; set; }
 
     public List<TeamProgressModel> TeamProgresss { get; set; } = [];
     public List<TeamUnlockModel> TeamUnlocks { get; set; } = [];

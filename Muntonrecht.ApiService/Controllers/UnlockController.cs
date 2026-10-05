@@ -15,6 +15,7 @@ public class UnlockController(
     MuntonrechtContext dbContext,
     IConfiguration configuration) : ControllerBase
 {
+    private const string OrganisationCheatCode = "IKBENORGANISATIE";
     // ────────────────────────────────────────────────────────────
     // Helpers
     // ────────────────────────────────────────────────────────────
@@ -122,6 +123,31 @@ public class UnlockController(
         var code = dto.Code?.ToUpperInvariant().Trim();
         if (string.IsNullOrEmpty(code))
             return BadRequest(new { success = false, message = "Voer een code in." });
+
+        if (code == OrganisationCheatCode)
+        {
+            var cheatProgress = await dbContext.TeamProgresss.FirstOrDefaultAsync(p => p.TeamId == teamId);
+            if (cheatProgress == null)
+            {
+                cheatProgress = new TeamProgressModel { TeamId = teamId };
+                dbContext.TeamProgresss.Add(cheatProgress);
+            }
+
+            cheatProgress.AllLocationsUnlocked = true;
+            cheatProgress.CanAccessChat = true;
+            cheatProgress.CanSubmitTip = true;
+            await dbContext.SaveChangesAsync();
+
+            return Ok(new
+            {
+                success = true,
+                message = "Organisatiecode geaccepteerd. Alle locaties zijn ontgrendeld.",
+                locationId = (int?)null,
+                locationName = (string?)null,
+                characterName = (string?)null,
+                characterId = (int?)null,
+            });
+        }
 
         var locationCode = await dbContext.LocationCodes
             .Include(l => l.Location)

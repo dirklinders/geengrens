@@ -1,24 +1,11 @@
 namespace Muntonrecht.ApiService.Models;
 
 /// <summary>
-/// Built-in fallback texts for the speluitleg page.
+/// Built-in fallback texts for player-facing game flow screens.
 /// Admins can override these via the GameSettings row (admin settings page).
 /// </summary>
 public static class GameDefaults
 {
-    public const string SpeluitlegTitle = "De Zaak Thieme";
-
-    public const string SpeluitlegBackstory =
-        """
-        In 2001 werd het lichaam van Willem Thieme in Zutphen uit het water gehaald. Er waren nauwelijks aanknopingspunten. Nu de onderzoekstermijn van 25 jaar voor deze cold case bijna verstreken is, doet de politie een laatste oproep aan het publiek: help de zaak op te lossen.
-
-        Zeven mogelijke moordlocaties, zeven verdachten — van wie één nergens bij naam wordt genoemd — en zeven mogelijke moordwapens. Achterhaal wie zich in de nacht van 10 oktober 2001 waar bevond en welk mogelijk wapen diegene bij zich droeg. Misschien komt de moordenaar zo vanzelf aan het licht.
-
-        De politie heeft alle informatie vrijgegeven die zij wettelijk mag delen. De dossiers liggen klaar. Het onderzoek is aan jullie. Veel succes.
-        """;
-
-    public const string SpeluitlegRules = RulesBody;
-
     public const string IntroTitle = "Telegram uit het politiebureau";
 
     public const string IntroBody =
