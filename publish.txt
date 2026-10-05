@@ -1,0 +1,4 @@
+cd /var/www/backend
+git pull
+dotnet publish -c Release -o out
+sudo systemctl restart backend
