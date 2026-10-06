@@ -26,4 +26,5 @@ public class TeamModel
     public List<ChatModel> Chats { get; set; } = [];
     public List<TeamWeaponModel> TeamWeapons { get; set; } = [];
     public List<TeamLogigramMarkModel> TeamLogigramMarks { get; set; } = [];
+    public List<TeamSearchPictureRevealModel> TeamSearchPictureReveals { get; set; } = [];
 }

@@ -50,4 +50,5 @@ public class LocationModel
     public List<LocationCodeModel> LocationCodes { get; set; } = [];
 
     public List<TeamProgressModel> TeamProgresss { get; set; } = [];
+    public List<TeamSearchPictureRevealModel> TeamSearchPictureReveals { get; set; } = [];
 }

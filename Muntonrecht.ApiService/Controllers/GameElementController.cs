@@ -124,6 +124,15 @@ public class GameElementController(
             .OrderBy(l => l.Name)
             .ToListAsync();
 
+        var revealedHotspotsByLocation = user is { TeamId: > 0 }
+            ? (await dbContext.TeamSearchPictureReveals
+                .Where(r => r.TeamId == user.TeamId)
+                .Select(r => new { r.LocationId, r.HotspotId })
+                .ToListAsync())
+                .GroupBy(r => r.LocationId)
+                .ToDictionary(g => g.Key, g => g.Select(r => r.HotspotId).ToArray())
+            : new Dictionary<int, string[]>();
+
         var result = locations.Select(l =>
         {
             var isUnlocked = unlockedLocationIds.Contains(l.Id);
@@ -158,6 +167,9 @@ public class GameElementController(
                 isUnlocked,
                 contentType = l.ContentType,
                 content,
+                // Team-scoped, so a discovery made by one player is visible to
+                // every player in that team after the next refresh.
+                revealedHotspotIds = revealedHotspotsByLocation.GetValueOrDefault(l.Id, []),
             };
         });
 
@@ -242,6 +254,30 @@ public class GameElementController(
                 c.Description,
                 c.AvatarUrl,
                 c.Personality,
+            })
+            .ToListAsync();
+
+        return Ok(characters);
+    }
+
+    /// <summary>
+    /// Returns every suspect that can be named in the final accusation. Unlike
+    /// UnlockedCharacters this deliberately does not depend on map-location
+    /// assignments: a valid suspect may not have a location of their own.
+    /// </summary>
+    [Authorize]
+    [HttpGet("AccusationCharacters")]
+    public async Task<IActionResult> AccusationCharacters()
+    {
+        var characters = await dbContext.Characters
+            .OrderBy(character => character.Name)
+            .Select(character => new
+            {
+                character.Id,
+                character.Name,
+                character.Description,
+                character.AvatarUrl,
+                character.Personality,
             })
             .ToListAsync();
 
@@ -523,6 +559,68 @@ public class GameElementController(
     }
 
     /// <summary>
+    /// Persists one discovered hotspot for the current team. The operation is
+    /// idempotent, allowing clients to retry safely after a transient failure.
+    /// </summary>
+    [Authorize]
+    [HttpPost("SearchPicture/Reveals")]
+    public async Task<IActionResult> RevealSearchPictureHotspot([FromBody] SearchPictureRevealDTO dto)
+    {
+        var user = await GetCurrentUser();
+        if (user == null || user.TeamId == 0)
+            return BadRequest("Je bent niet aan een team gekoppeld.");
+
+        var hotspotId = dto.HotspotId?.Trim();
+        if (dto.LocationId <= 0 || string.IsNullOrWhiteSpace(hotspotId))
+            return BadRequest("Locatie en vondst zijn verplicht.");
+
+        var unlockedLocationIds = await GetUnlockedLocationIdsAsync(user.TeamId);
+        if (!unlockedLocationIds.Contains(dto.LocationId))
+            return Forbid();
+
+        var location = await dbContext.Locations.FindAsync(dto.LocationId);
+        if (location == null || location.ContentType != "search_picture")
+            return NotFound();
+
+        var knownHotspotIds = new HashSet<string>();
+        try
+        {
+            var hotspots = JsonNode.Parse(location.ContentJson)?["hotspots"] as JsonArray;
+            if (hotspots != null)
+            {
+                for (var index = 0; index < hotspots.Count; index++)
+                {
+                    var configuredId = hotspots[index]?["id"]?.GetValue<string>()?.Trim();
+                    knownHotspotIds.Add(string.IsNullOrWhiteSpace(configuredId) ? index.ToString() : configuredId);
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            return BadRequest("De zoekfoto is ongeldig geconfigureerd.");
+        }
+
+        if (!knownHotspotIds.Contains(hotspotId))
+            return BadRequest("Deze vondst bestaat niet op de zoekfoto.");
+
+        var alreadyRevealed = await dbContext.TeamSearchPictureReveals.AnyAsync(r =>
+            r.TeamId == user.TeamId && r.LocationId == dto.LocationId && r.HotspotId == hotspotId);
+        if (!alreadyRevealed)
+        {
+            dbContext.TeamSearchPictureReveals.Add(new TeamSearchPictureRevealModel
+            {
+                TeamId = user.TeamId,
+                LocationId = dto.LocationId,
+                HotspotId = hotspotId,
+                RevealedAt = DateTime.UtcNow,
+            });
+            await dbContext.SaveChangesAsync();
+        }
+
+        return Ok(new { revealed = true });
+    }
+
+    /// <summary>
     /// Returns the TeamProgress for the current user's team, creating it if
     /// needed; null when the user is not linked to a team.
     /// </summary>
@@ -553,5 +651,11 @@ public class GameElementController(
 
         /// <summary>"none" | "cross" | "check".</summary>
         public string Mark { get; set; } = "none";
+    }
+
+    public class SearchPictureRevealDTO
+    {
+        public int LocationId { get; set; }
+        public string? HotspotId { get; set; }
     }
 }
