@@ -36,7 +36,7 @@ public static class GameDefaults
 
         1. Open de kaart. Elke locatie bevat informatie van de politie.
 
-        2. Ga naar de locatie en scan daar de NFC-tag. Daarmee ontgrendelen jullie het dossier van die locatie.
+        2. Ga naar de locatie en zoek naar de NFC-tag met het groene MO-logo. Scan de tag om het dossier van die locatie te ontgrendelen.
 
         3. Lees goed. In verklaringen zijn delen zwart gelakt — wat eronder staat, blijft verborgen.
 
