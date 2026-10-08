@@ -192,6 +192,7 @@ public class GameElementController(
             {
                 canAccessChat = false,
                 canSubmitTip = false,
+                tipSubmitted = false,
                 unlockedLocations = 0,
                 totalLocations = 0,
                 isPlaytest = false,
@@ -208,7 +209,8 @@ public class GameElementController(
         return Ok(new
         {
             canAccessChat = progress.CanAccessChat,
-            canSubmitTip = visits.Total > 0 && visits.Visited == visits.Total,
+            canSubmitTip = visits.Total > 0 && visits.Visited == visits.Total && !progress.TipSubmitted,
+            tipSubmitted = progress.TipSubmitted,
             unlockedLocations = visits.Visited,
             totalLocations = visits.Total,
             isPlaytest = team?.IsPlaytest ?? false,

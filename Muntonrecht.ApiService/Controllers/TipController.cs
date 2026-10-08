@@ -49,13 +49,10 @@ public class TipController(
         if (progress == null || visits.Total == 0 || visits.Visited != visits.Total)
             return Forbid();
 
-        // Return cached result if already submitted
+        // A final accusation is strictly one-shot. Do not return the verdict
+        // here: players receive only a receipt, and admins see the result.
         if (progress.TipSubmitted)
-            return Ok(new
-            {
-                alreadySubmitted = true,
-                isCorrect = progress.TipIsCorrect,
-            });
+            return Conflict("Er is al een definitieve aanklacht voor dit team ingediend.");
 
         var settings = await dbContext.GameSettings.FirstOrDefaultAsync();
         if (settings == null || settings.MurdererCharacterId <= 0 ||
@@ -77,7 +74,7 @@ public class TipController(
 
         await dbContext.SaveChangesAsync();
 
-        return Ok(new { alreadySubmitted = false, isCorrect });
+        return Ok(new { submitted = true });
     }
 
     /// <summary>

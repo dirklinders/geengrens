@@ -124,6 +124,9 @@ public class AdminController(
             .ToListAsync();
 
         var users = userManager.Users.ToList();
+        var characterNames = await dbContext.Characters.ToDictionaryAsync(c => c.Id, c => c.Name);
+        var weaponNames = await dbContext.Weapons.ToDictionaryAsync(w => w.Id, w => w.Name);
+        var locationNames = await dbContext.Locations.ToDictionaryAsync(l => l.Id, l => l.Name);
 
         var result = teams.Select(t =>
         {
@@ -144,6 +147,15 @@ public class AdminController(
                     tipSuspectId = prog.TipSuspectId,
                     tipWeaponId = prog.TipWeaponId,
                     tipLocationId = prog.TipLocationId,
+                    tipSuspectName = int.TryParse(prog.TipSuspectId, out var suspectId)
+                        ? characterNames.GetValueOrDefault(suspectId)
+                        : null,
+                    tipWeaponName = prog.TipWeaponId is int weaponId
+                        ? weaponNames.GetValueOrDefault(weaponId)
+                        : null,
+                    tipLocationName = prog.TipLocationId is int locationId
+                        ? locationNames.GetValueOrDefault(locationId)
+                        : null,
                     tipIsCorrect = prog.TipIsCorrect,
                 },
                 unlockedCount = teamUnlocks.Count,
@@ -252,6 +264,9 @@ public class AdminController(
             .Where(c => c.TeamId == teamId)
             .OrderBy(c => c.Id)
             .ToListAsync();
+        var characterNames = await dbContext.Characters.ToDictionaryAsync(c => c.Id, c => c.Name);
+        var weaponNames = await dbContext.Weapons.ToDictionaryAsync(w => w.Id, w => w.Name);
+        var locationNames = await dbContext.Locations.ToDictionaryAsync(l => l.Id, l => l.Name);
 
         var chatsByCharacter = chats
             .GroupBy(c => c.CharacterId)
@@ -290,6 +305,15 @@ public class AdminController(
                 tipSuspectId       = progress.TipSuspectId,
                 tipWeaponId        = progress.TipWeaponId,
                 tipLocationId      = progress.TipLocationId,
+                tipSuspectName     = int.TryParse(progress.TipSuspectId, out var suspectId)
+                    ? characterNames.GetValueOrDefault(suspectId)
+                    : null,
+                tipWeaponName      = progress.TipWeaponId is int weaponId
+                    ? weaponNames.GetValueOrDefault(weaponId)
+                    : null,
+                tipLocationName    = progress.TipLocationId is int locationId
+                    ? locationNames.GetValueOrDefault(locationId)
+                    : null,
                 tipIsCorrect       = progress.TipIsCorrect,
             },
             unlockedCodes,
