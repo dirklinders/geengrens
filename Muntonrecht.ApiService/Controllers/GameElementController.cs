@@ -193,6 +193,7 @@ public class GameElementController(
                 canAccessChat = false,
                 canSubmitTip = false,
                 tipSubmitted = false,
+                unknownSuspectName = (string?)null,
                 unlockedLocations = 0,
                 totalLocations = 0,
                 isPlaytest = false,
@@ -211,6 +212,7 @@ public class GameElementController(
             canAccessChat = progress.CanAccessChat,
             canSubmitTip = visits.Total > 0 && visits.Visited == visits.Total && !progress.TipSubmitted,
             tipSubmitted = progress.TipSubmitted,
+            unknownSuspectName = progress.UnknownSuspectName,
             unlockedLocations = visits.Visited,
             totalLocations = visits.Total,
             isPlaytest = team?.IsPlaytest ?? false,
@@ -218,6 +220,27 @@ public class GameElementController(
             introSeen = progress.IntroSeenAt != null,
             rulesSeen = progress.RulesSeenAt != null,
         });
+    }
+
+    /// <summary>
+    /// Saves the team's working name for the anonymous suspect. The name is
+    /// shared by the team and becomes read-only after its final accusation.
+    /// </summary>
+    [Authorize]
+    [HttpPut("UnknownSuspectName")]
+    public async Task<IActionResult> SetUnknownSuspectName([FromBody] UnknownSuspectNameDTO dto)
+    {
+        var user = await GetCurrentUser();
+        if (user == null || user.TeamId == 0)
+            return BadRequest("Je bent niet aan een team gekoppeld.");
+
+        var progress = await GetOrCreateTeamProgress(user.TeamId);
+        if (progress.TipSubmitted)
+            return Conflict("De definitieve aanklacht is al ingediend.");
+
+        progress.UnknownSuspectName = dto.Name?.Trim() ?? string.Empty;
+        await dbContext.SaveChangesAsync();
+        return Ok(new { unknownSuspectName = progress.UnknownSuspectName });
     }
 
     /// <summary>
@@ -659,5 +682,10 @@ public class GameElementController(
     {
         public int LocationId { get; set; }
         public string? HotspotId { get; set; }
+    }
+
+    public class UnknownSuspectNameDTO
+    {
+        public string? Name { get; set; }
     }
 }

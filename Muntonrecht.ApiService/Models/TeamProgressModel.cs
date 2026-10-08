@@ -27,6 +27,12 @@ public class TeamProgressModel
     /// <summary>The suspect ID the team accused (CharacterModel Id as string)</summary>
     public string? TipSuspectId { get; set; }
 
+    /// <summary>The name the team entered for the anonymous suspect at submission time.</summary>
+    public string? TipSuspectDisplayName { get; set; }
+
+    /// <summary>The team's working name for the anonymous suspect; locked after final submission.</summary>
+    public string? UnknownSuspectName { get; set; }
+
     /// <summary>Whether their tip was correct (set after submission)</summary>
     public bool? TipIsCorrect { get; set; }
 

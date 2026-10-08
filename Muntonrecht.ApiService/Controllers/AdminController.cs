@@ -147,7 +147,9 @@ public class AdminController(
                     tipSuspectId = prog.TipSuspectId,
                     tipWeaponId = prog.TipWeaponId,
                     tipLocationId = prog.TipLocationId,
-                    tipSuspectName = int.TryParse(prog.TipSuspectId, out var suspectId)
+                    tipSuspectName = !string.IsNullOrWhiteSpace(prog.TipSuspectDisplayName)
+                        ? prog.TipSuspectDisplayName
+                        : int.TryParse(prog.TipSuspectId, out var suspectId)
                         ? characterNames.GetValueOrDefault(suspectId)
                         : null,
                     tipWeaponName = prog.TipWeaponId is int weaponId
@@ -305,7 +307,9 @@ public class AdminController(
                 tipSuspectId       = progress.TipSuspectId,
                 tipWeaponId        = progress.TipWeaponId,
                 tipLocationId      = progress.TipLocationId,
-                tipSuspectName     = int.TryParse(progress.TipSuspectId, out var suspectId)
+                tipSuspectName     = !string.IsNullOrWhiteSpace(progress.TipSuspectDisplayName)
+                    ? progress.TipSuspectDisplayName
+                    : int.TryParse(progress.TipSuspectId, out var suspectId)
                     ? characterNames.GetValueOrDefault(suspectId)
                     : null,
                 tipWeaponName      = progress.TipWeaponId is int weaponId

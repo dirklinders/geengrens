@@ -65,9 +65,13 @@ public class TipController(
         var isCorrect = dto.CharacterId == settings.MurdererCharacterId
             && dto.WeaponId == settings.MurderWeaponId
             && dto.LocationId == settings.MurderLocationId;
+        var accusedCharacter = await dbContext.Characters.FindAsync(dto.CharacterId.Value);
 
         progress.TipSubmitted = true;
         progress.TipSuspectId = dto.CharacterId.Value.ToString();
+        progress.TipSuspectDisplayName = accusedCharacter?.Name == "?"
+            ? progress.UnknownSuspectName
+            : null;
         progress.TipWeaponId = dto.WeaponId;
         progress.TipLocationId = dto.LocationId;
         progress.TipIsCorrect = isCorrect;
