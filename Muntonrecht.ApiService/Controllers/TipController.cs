@@ -82,8 +82,9 @@ public class TipController(
     }
 
     /// <summary>
-    /// Upload a CSV file with location coordinates.
-    /// Expected columns: Name,Description,Latitude,Longitude,CharacterId
+    /// Imports NFC/QR location codes. Each row is matched to an existing map
+    /// location by its name, so the CSV does not depend on database IDs.
+    /// Expected columns: Code,Locatienaam,UnlockMessage.
     /// </summary>
     [HttpPost("UploadLocations")]
     [DisableRequestSizeLimit]
@@ -95,7 +96,7 @@ public class TipController(
         if (!Path.GetExtension(file.FileName).Equals(".csv", StringComparison.OrdinalIgnoreCase))
             return BadRequest("Alleen CSV-bestanden worden geaccepteerd.");
 
-        var locations = new List<LocationModel>();
+        var locationCodes = new List<LocationCodeModel>();
 
         using var reader = new StreamReader(file.OpenReadStream());
         var header = await reader.ReadLineAsync();
@@ -103,6 +104,12 @@ public class TipController(
             return BadRequest("Leeg CSV-bestand.");
 
         var headers = header.Split(',').Select(h => h.Trim().ToLowerInvariant()).ToArray();
+        if (!headers.Contains("code") || !headers.Contains("locatienaam"))
+            return BadRequest("CSV moet minimaal de kolommen Code en Locatienaam bevatten.");
+
+        var locationsByName = (await dbContext.Locations.ToListAsync())
+            .ToDictionary(location => location.Name, StringComparer.OrdinalIgnoreCase);
+        var importedCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         int lineNum = 0;
         while (!reader.EndOfStream)
@@ -112,26 +119,35 @@ public class TipController(
             if (string.IsNullOrWhiteSpace(line)) continue;
 
             var values = ParseCsvLine(line);
-            if (values.Length < headers.Length) continue;
+            var code = GetValue(values, headers, "code", lineNum).Trim().ToUpperInvariant();
+            var locationName = GetValue(values, headers, "locatienaam", lineNum).Trim();
+            if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(locationName))
+                return BadRequest($"Regel {lineNum}: Code en Locatienaam zijn verplicht.");
+            if (!locationsByName.TryGetValue(locationName, out var location))
+                return BadRequest($"Regel {lineNum}: locatie '{locationName}' bestaat niet.");
+            if (!importedCodes.Add(code))
+                return BadRequest($"Regel {lineNum}: code '{code}' komt meerdere keren voor in het bestand.");
 
-            var parsedCharacterId = ParseInt(GetValue(values, headers, "characterid", lineNum), lineNum, "characterId");
-
-            var location = new LocationModel
+            locationCodes.Add(new LocationCodeModel
             {
-                Name = GetValue(values, headers, "name", lineNum),
-                Description = GetValue(values, headers, "description", lineNum),
-                Latitude = ParseDouble(GetValue(values, headers, "latitude", lineNum), lineNum, "latitude"),
-                Longitude = ParseDouble(GetValue(values, headers, "longitude", lineNum), lineNum, "longitude"),
-                // Missing/0 means "no suspect" — store NULL so the FK stays satisfied.
-                CharacterId = parsedCharacterId > 0 ? parsedCharacterId : null,
-            };
-            locations.Add(location);
+                Code = code,
+                LocationName = locationName,
+                UnlockMessage = GetValue(values, headers, "unlockmessage", lineNum),
+                LocationId = location.Id,
+            });
         }
 
-        dbContext.Locations.AddRange(locations);
+        var existingCodes = await dbContext.LocationCodes
+            .Select(locationCode => locationCode.Code)
+            .ToListAsync();
+        var duplicate = existingCodes.FirstOrDefault(code => importedCodes.Contains(code));
+        if (duplicate != null)
+            return Conflict($"Code '{duplicate}' bestaat al.");
+
+        dbContext.LocationCodes.AddRange(locationCodes);
         await dbContext.SaveChangesAsync();
 
-        return Ok(new { count = locations.Count, message = $" {locations.Count} locaties geïmporteerd." });
+        return Ok(new { count = locationCodes.Count, message = $" {locationCodes.Count} locatiecodes geïmporteerd." });
     }
 
     // ────────────────────────────────────────────────────────────
