@@ -310,6 +310,30 @@ public class GameElementController(
     }
 
     /// <summary>
+    /// Returns every weapon that can be named in the final accusation. The
+    /// generated /api/Weapon CRUD is admin-only, so players need this
+    /// player-facing read. StopKeywordWeapon is deliberately excluded: it is
+    /// the secret chat keyword that unlocks weapon discoveries and must never
+    /// reach the client.
+    /// </summary>
+    [Authorize]
+    [HttpGet("Weapons")]
+    public async Task<IActionResult> Weapons()
+    {
+        var weapons = await dbContext.Weapons
+            .OrderBy(weapon => weapon.Name)
+            .Select(weapon => new
+            {
+                weapon.Id,
+                weapon.Name,
+                weapon.Description,
+            })
+            .ToListAsync();
+
+        return Ok(weapons);
+    }
+
+    /// <summary>
     /// Returns the pre-assigned location for the current team.
     /// </summary>
     [Authorize]
